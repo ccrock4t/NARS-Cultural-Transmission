@@ -193,14 +193,14 @@ public class NARSHost : MonoBehaviour
             GetSensorimotor().SetOp(operation);
         }
 
-        if (eventArgs.Data.Contains("EXE:") || eventArgs.Data.Contains("Executed"))
+/*        if (eventArgs.Data.Contains("EXE:") || eventArgs.Data.Contains("Executed"))
         {
             if (statisticsStreamwriter == null)
             {
                 statisticsStreamwriter = File.CreateText("decisionlog.txt");
             }
             statisticsStreamwriter.WriteLine(eventArgs.Data);
-        }
+        }*/
 
     }
 

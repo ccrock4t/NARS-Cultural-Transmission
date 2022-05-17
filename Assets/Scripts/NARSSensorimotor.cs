@@ -8,14 +8,10 @@ public class NARSSensorimotor : MonoBehaviour
 {
     private NARSHost _host;
 
-    Camera bodyCamera;
     CharacterController bodyController;
 
     float TIMER_DURATION = 0.33f; // how often to send inputs to NARS
     float timer = 0;
-
-    List<GameObject> visibleObjs;
-    Queue<string> inputQueue = new Queue<string>();
 
     public float rotatingAngle = 0f;
     public Vector3 moveVector = Vector3.zero;
@@ -27,7 +23,6 @@ public class NARSSensorimotor : MonoBehaviour
     {
         timer = TIMER_DURATION;
 
-        bodyCamera = GetComponentInChildren<Camera>();
         bodyController = GetComponent<CharacterController>();
     }
 
