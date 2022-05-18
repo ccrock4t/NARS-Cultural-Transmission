@@ -21,6 +21,8 @@ public class NARSHost : MonoBehaviour
 
     StreamWriter statisticsStreamwriter;
 
+    Queue<string> inputQueue;
+
 
     //UI output text
     string lastOperationTextForUI = "";
@@ -49,6 +51,8 @@ public class NARSHost : MonoBehaviour
 
         _sensorimotor = GetComponent<NARSSensorimotor>();
         _sensorimotor.SetNARSHost(this);
+
+        this.inputQueue = new Queue<string>();
 
         //_sensorimotor.TeachInitialKnowledge();
     }
@@ -89,7 +93,16 @@ public class NARSHost : MonoBehaviour
             }
         }
 
+        if(this.inputQueue.Count > 0)
+        {
+            if (this.inputQueue.Count > 20)
+            {
+                UnityEngine.Debug.Log("WARNING: INPUT QUEUE IS NOT EMPTYING FASTER THAN IT IS BEING FILLED, count=" + this.inputQueue.Count);
+            }
+                this.AddInput(inputQueue.Dequeue());
+        }
     }
+
 
     void Babble()
     {
@@ -115,7 +128,7 @@ public class NARSHost : MonoBehaviour
 
         if (input != "")
         {
-            this.AddInput(input);
+            this.QueueInput(input);
         }
     }
 
@@ -171,15 +184,21 @@ public class NARSHost : MonoBehaviour
 
     public void AddInferenceCycles(int cycles)
     {
-        AddInput("" + cycles);
+        inputStreamWriter.WriteLine("" + cycles);
+    }
+
+    public void QueueInput(string message)
+    {
+        this.inputQueue.Enqueue(message);
     }
 
     public void AddInput(string message)
     {
-        //UnityEngine.Debug.Log("SENDING INPUT: " + message);
+        UnityEngine.Debug.Log("SENDING INPUT: " + message);
 
         inputStreamWriter.WriteLine(message);
     }
+
     void NARSOutputReceived(object sender, DataReceivedEventArgs eventArgs)
     {
         //UnityEngine.Debug.Log(eventArgs.Data);
@@ -206,7 +225,7 @@ public class NARSHost : MonoBehaviour
 
     void ONAOutputReceived(object sender, DataReceivedEventArgs eventArgs)
     {
-        UnityEngine.Debug.Log(eventArgs.Data);
+        //UnityEngine.Debug.Log(eventArgs.Data);
         if (eventArgs.Data.Contains("executed with args")) //operation executed
         {
             string operation = eventArgs.Data.Split(' ')[0];

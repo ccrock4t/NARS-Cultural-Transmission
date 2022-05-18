@@ -10,20 +10,55 @@ public class NARSSensorimotor : MonoBehaviour
 
     CharacterController bodyController;
 
-    float TIMER_DURATION = 0.33f; // how often to send inputs to NARS
+    float TIMER_DURATION = 0.3f; // how often to send inputs to NARS
     float timer = 0;
 
     public float rotatingAngle = 0f;
     public Vector3 moveVector = Vector3.zero;
+    int layerMask;
 
     string opToExecute = "";
 
+    List<Dome> domes;
+
+    [SerializeField]
+    public Teacher teacher;
+
+    //raycast directions
+    int[] azimuth_degrees;
+    int[] altitude_degrees;
+    float[] azimuth_radians;
+    float[] altitude_radians;
     // Start is called before the first frame update
     void Start()
     {
         timer = TIMER_DURATION;
 
         bodyController = GetComponent<CharacterController>();
+
+        //set up raycast directions
+        this.azimuth_degrees = new int[] { 0, 45, 90, 135, 180, 225, 270, 315 };
+        this.altitude_degrees = new int[] { -90, -45, 0, 45, 90 };
+        this.azimuth_radians = azimuth_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
+        this.altitude_radians = altitude_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
+
+        // Set up raycast layermask
+        // ---------
+        // Bit shift the index of the layer (layer 8, the player layer) to get a bit mask
+        int layerMask = 1 << 8;
+
+        // This would cast rays only against colliders in layer 8.
+        // But instead we want to collide against everything except layer 8. The ~ operator does this, it inverts a bitmask.
+        this.layerMask = ~layerMask;
+
+        // Cache objects we might raycast (since GetComponent<> is computationally expensive)
+        GameObject domeGO = GameObject.Find("Domes");
+        if (domeGO == null) Debug.LogError("Domes object not found.");
+        domes = new List<Dome>();
+        foreach (Dome dome in domeGO.GetComponentsInChildren<Dome>())
+        {
+            domes.Add(dome);
+        }
     }
 
     public void SetNARSHost(NARSHost host)
@@ -46,7 +81,7 @@ public class NARSSensorimotor : MonoBehaviour
         if (timer <= 0f)
         {
 
-            //DrawRays(true);
+            Lidar();
             RemindGoal();
 
             timer = TIMER_DURATION;
@@ -78,8 +113,7 @@ public class NARSSensorimotor : MonoBehaviour
 
     void QueueInput(string input)
     {
-        GetNARSHost().AddInput(input);
-        //inputQueue.Enqueue(input);
+        GetNARSHost().QueueInput(input);
     }
 
     void MoveBody()
@@ -90,19 +124,10 @@ public class NARSSensorimotor : MonoBehaviour
 
     // Perception
 
-    private void FixedUpdate()
+    void Lidar()
     {
-        DrawRays(false);
-    }
-
-    void DrawRays(bool LIDARSense)
-    {
-        int[] azimuth_degrees = new int[] { 0, 45, 90, 135, 180, 225, 270, 315 };
-        int[] altitude_degrees = new int[] { -90, -45, 0, 45, 90 };
-        float[] azimuth_radians = azimuth_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
-        float[]  altitude_radians = altitude_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
-
-
+        string subject = "";
+        Vector3Int lidarIDIndex = Vector3Int.zero;
         foreach (float azimuthX in azimuth_radians)
         {
             foreach (float altitude in altitude_radians)
@@ -110,29 +135,56 @@ public class NARSSensorimotor : MonoBehaviour
                 foreach (float azimuthZ in azimuth_radians)
                 {
                     // Does the ray intersect any objects excluding the player layer
-                    Vector3 rotation = new Vector3(Mathf.Cos(azimuthX), Mathf.Cos(altitude), Mathf.Cos(azimuthZ));
+                    Vector3 direction = new Vector3(Mathf.Cos(azimuthX), Mathf.Sin(altitude), Mathf.Cos(azimuthZ));
                     int length = 10;
-                   // Debug.Log(rotation);
-                    Debug.DrawRay(transform.position, transform.TransformDirection(rotation)  * length, Color.green);
 
-                    if (LIDARSense)
+                    RaycastHit hit;
+                    // Does the ray intersect any objects excluding the player layer
+                    if (Physics.Raycast(transform.position, transform.TransformDirection(direction), out hit, Mathf.Infinity, this.layerMask))
                     {
-                        RaycastHit hit;
-                        // Does the ray intersect any objects excluding the player layer
-                        if (Physics.Raycast(transform.position, transform.TransformDirection(rotation), out hit, Mathf.Infinity))
-                        {
-                            Debug.DrawRay(transform.position, transform.TransformDirection(rotation) * hit.distance, Color.red);
-                            //Debug.Log("Did Hit");
-                        }
-                        else
-                        {
-                            //Debug.Log("Did not Hit");
-                        }
+                        Debug.DrawRay(transform.position, transform.TransformDirection(direction) * length, Color.red, TIMER_DURATION);
+                        Vector3 lidarID = new Vector3(this.azimuth_degrees[lidarIDIndex.x % this.azimuth_degrees.Length], 
+                            this.altitude_degrees[lidarIDIndex.y % this.altitude_degrees.Length], 
+                            this.azimuth_degrees[lidarIDIndex.z % this.azimuth_degrees.Length]);
+                        string rayString = GetLidarHitString(lidarID, hit);
+                        subject += rayString;
+                        //Debug.Log("Did Hit");
                     }
+                    else
+                    {
+                        Debug.DrawRay(transform.position, transform.TransformDirection(direction) * length, Color.green, TIMER_DURATION);
+                        //Debug.Log("Did not Hit");
+                    }
+                    
+                    lidarIDIndex.z++;
                 }
+                lidarIDIndex.y++;
+            }
+            lidarIDIndex.x++;
+        }
+
+
+        QueueInput("<" + subject + " --> hit>. :|:");
+    }
+
+    public string GetLidarHitString(Vector3 lidarID, RaycastHit hit)
+    {
+        string lidarString = "Lidar" + lidarID.x + "x" + lidarID.y + "x" + lidarID.z;
+        foreach (Dome dome in this.domes)
+        {
+            if(hit.transform == dome.transform)
+            {
+                string domeColorString = dome.color.ToString();
+                return lidarString + domeColorString;
             }
         }
 
+        if (hit.transform == teacher.transform)
+        {
+            return lidarString + "teacher";
+        }
+
+        return "";
     }
 
 
