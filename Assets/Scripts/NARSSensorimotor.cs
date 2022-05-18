@@ -10,7 +10,7 @@ public class NARSSensorimotor : MonoBehaviour
 
     CharacterController bodyController;
 
-    float TIMER_DURATION = 0.3f; // how often to send inputs to NARS
+    float TIMER_DURATION = 0.5f; // how often to queue sensory inputs
     float timer = 0;
 
     public float rotatingAngle = 0f;
@@ -37,7 +37,7 @@ public class NARSSensorimotor : MonoBehaviour
         bodyController = GetComponent<CharacterController>();
 
         //set up raycast directions
-        this.azimuth_degrees = new int[] { 0, 45, 90, 135, 180, 225, 270, 315 };
+        this.azimuth_degrees = new int[] { 0, 90, 180, 270 };
         this.altitude_degrees = new int[] { -90, -45, 0, 45, 90 };
         this.azimuth_radians = azimuth_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
         this.altitude_radians = altitude_degrees.Select(d => d * Mathf.Deg2Rad).ToArray();
@@ -113,6 +113,7 @@ public class NARSSensorimotor : MonoBehaviour
 
     void QueueInput(string input)
     {
+        //Debug.Log("queueing " + input);
         GetNARSHost().QueueInput(input);
     }
 
@@ -126,7 +127,7 @@ public class NARSSensorimotor : MonoBehaviour
 
     void Lidar()
     {
-        string subject = "";
+        int events = 0;
         Vector3Int lidarIDIndex = Vector3Int.zero;
         foreach (float azimuthX in azimuth_radians)
         {
@@ -142,12 +143,23 @@ public class NARSSensorimotor : MonoBehaviour
                     // Does the ray intersect any objects excluding the player layer
                     if (Physics.Raycast(transform.position, transform.TransformDirection(direction), out hit, Mathf.Infinity, this.layerMask))
                     {
-                        Debug.DrawRay(transform.position, transform.TransformDirection(direction) * length, Color.red, TIMER_DURATION);
+                        
                         Vector3 lidarID = new Vector3(this.azimuth_degrees[lidarIDIndex.x % this.azimuth_degrees.Length], 
                             this.altitude_degrees[lidarIDIndex.y % this.altitude_degrees.Length], 
                             this.azimuth_degrees[lidarIDIndex.z % this.azimuth_degrees.Length]);
                         string rayString = GetLidarHitString(lidarID, hit);
-                        subject += rayString;
+                        if(rayString.Length > 0)
+                        {
+                            QueueInput("<" + rayString + " --> hit>. :|:");
+                            Debug.DrawRay(transform.position, transform.TransformDirection(direction) * length, Color.red, TIMER_DURATION);
+                            events++;
+                        }
+                        else
+                        {
+                            Debug.DrawRay(transform.position, transform.TransformDirection(direction) * length, Color.green, TIMER_DURATION);
+                        }
+                        //subject += rayString;
+                       
                         //Debug.Log("Did Hit");
                     }
                     else
@@ -163,13 +175,13 @@ public class NARSSensorimotor : MonoBehaviour
             lidarIDIndex.x++;
         }
 
-
-        QueueInput("<" + subject + " --> hit>. :|:");
+        //QueueInput("<" + subject + " --> hit>. :|:");
     }
 
     public string GetLidarHitString(Vector3 lidarID, RaycastHit hit)
     {
         string lidarString = "Lidar" + lidarID.x + "x" + lidarID.y + "x" + lidarID.z;
+        lidarString = lidarString.Replace("-", "m");
         foreach (Dome dome in this.domes)
         {
             if(hit.transform == dome.transform)

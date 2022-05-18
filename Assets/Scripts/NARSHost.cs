@@ -23,10 +23,12 @@ public class NARSHost : MonoBehaviour
 
     Queue<string> inputQueue;
 
-
     //UI output text
     string lastOperationTextForUI = "";
     bool operationUpdated = false;
+
+    float inputTimer = 0;
+    const float INPUT_TIMER_DURATION = 0.03f; 
 
     //Babbling
     float babbleTimer = 0;
@@ -93,13 +95,16 @@ public class NARSHost : MonoBehaviour
             }
         }
 
-        if(this.inputQueue.Count > 0)
+        inputTimer -= Time.deltaTime;
+
+        if(this.inputQueue.Count > 0 && inputTimer < 0)
         {
-            if (this.inputQueue.Count > 20)
+            if (this.inputQueue.Count > 40)
             {
                 UnityEngine.Debug.Log("WARNING: INPUT QUEUE IS NOT EMPTYING FASTER THAN IT IS BEING FILLED, count=" + this.inputQueue.Count);
             }
-                this.AddInput(inputQueue.Dequeue());
+            this.AddInput(inputQueue.Dequeue());
+            inputTimer = INPUT_TIMER_DURATION;
         }
     }
 
@@ -194,9 +199,10 @@ public class NARSHost : MonoBehaviour
 
     public void AddInput(string message)
     {
-        UnityEngine.Debug.Log("SENDING INPUT: " + message);
+        //UnityEngine.Debug.Log("SENDING INPUT: " + message);
 
         inputStreamWriter.WriteLine(message);
+        inputStreamWriter.Flush();
     }
 
     void NARSOutputReceived(object sender, DataReceivedEventArgs eventArgs)
